@@ -22,6 +22,7 @@ way of getting values.
 """
 import _mysql
 import math
+import random
 
 host = 'localhost'
 user = 'root'
@@ -29,7 +30,18 @@ userpass = 'rootiam'
 db = 'test'
 con = None
 configType = dict
-sensors = [1,2,3] #for testing there are only 3 sensors
+
+def _get_sensors():
+    """
+    returns a list of sensors
+    """
+    return [1,2,3]
+
+def _get_dimlvl():
+    """
+    Return a list of valid dimming levels
+    """
+    return [0,10,20,30]
 
 def connect(host,usr,upass, db):
     global con
@@ -56,43 +68,58 @@ def _get_sim_value(fid, sid, diml):
         raise _mysql.ProgrammingError, 'Query malformed, check table name'
 
 def _least_squares(truth, simul):
-    """
-    TODO: redo this so the inputs are dictionaries!
-    
-    Return the least squares of two list of numbers
+    """    
+    Return the least squares of dictionaries mapping from sensorID --> value
     
     @param truth - list of ordered observed sensor readings
     @param simul - list of ordered simulated readings
     """
-    assert len(truth) == len(simul)
-    diff = [math.pow(x - y,2) for x,y in zip(truth,simul)]
-    return sum(diff)
+    assert type(truth) == type(simul)
+    assert type(truth) == type({})
+    lsq = 0
+    for key in truth.iterkeys():
+        assert key in simul
+        lsq += math.pow(truth[key] - simul[key],2)
+    return lsq
     
 def initial_guess():
     """
     Returns the inital configuration guess. Do not know the form of the
-    configuration yet.
+    configuration yet. Probably a dictionary
     """
-    raise NotImplementedError
+    sensors = _get_sensors()
+    dim = _get_dimlvl()
+    config = {}
+    for sen in sensors:
+        ridx = random.randint(0,len(dim)-1)
+        config[sen] = dim[ridx]
+    return config
 
-def with_tol(config):
+def within_tol(config,ideal, tol):
     """
-    Returns true if configuration config is within the tolerance
+    Returns true if _least_squares(config,ideal)<tol
+
+    :config - dictionary
+    :ideal -dictionary
+    :tol - float
     """
-    raise NotImplementedError
+    lsq = _least_squares(config,ideal)
+    return lsq <= tol
 
 def neighbors(config):
     """
-    Returns the neighbors of configuration config
+    Returns the neighbors of configuration config.
+
+    Should make this an iterator, since the list might be larger.
     """
     raise NotImplementedError
 
 def _get_sim_single_fix(fix_id, diml):
     """
-    Returns a dictionary that maps from fix_id --> {sensor_id --> reading}, based on the dimming
-    level diml
+    Returns a dictionary that maps from fix_id --> {sensor_id --> reading}, based
+    on the dimming level diml
     """
-    global sensors
+    sensors = _get_sensors()
     d = {}
     for s in sensors:
         val = _get_sim_value(fix_id,s, diml)
@@ -119,7 +146,7 @@ def _sum_sensor_readings(sreadings):
     Sum all the readings according to sensorID and return a dictionary mapping from
     sensorID --> sum of reading values
     """
-    global sensors
+    sensors = _get_sensors()
     d ={}
     val = 0
     for sensor in sensors:
@@ -129,25 +156,41 @@ def _sum_sensor_readings(sreadings):
         d[sensor] = sval
     return d
 
-def cost(config):
+def get_truth(fix_level):
     """
-    Returns the cost of configuration config. The cost is the least squares of the simulated
-    values from the ground truth
+    Given a dictionary mapping from fixtureID --> Dimming Level, return the sensor reading
+    for each sensor.
+    """
+    pass
+
+def cost(fix_config,ideal):
+    """
+    Returns the cost of fixture configuration config, mapping from fixtureID --> dimming level
+    The cost is the least squares of the simulated values from the ground truth
     """
     global configType
-    assert type(config) == configType
+    assert type(fix_config) == configType
     #get simulated sensor readings for sensor per fixture
-    sim_values = _get_sim_all_fix(config)
+    sim_values = _get_sim_all_fix(fix_config)
     #sum over all fixtures, simulated values
+    sim_sum = _sum_sensor_readings(sim_values)
     #get the ground truth sensor readings
     #output least squares
     raise NotImplementedError
 
-def best_neighbor(nbors):
+def best_neighbor(nbors, ideal):
     """
     Returns the best (lowest cost) neighbor from a collection of neighbors nbors
+    when compared against ideal
     """
-    raise NotImplementedError
+    mcost = 10000000 #min cost, initially some arbitrary high number
+    mbor = {} # the best neighbor
+    for nbor in nbors:
+        cost = cost(nbors,ideal)
+        if cost < mcost:
+            mcost = cost
+            mbor = nbor
+    return mbor
 
 if __name__ == '__main__':
     connect(host,user,userpass,db)

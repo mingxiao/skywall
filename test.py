@@ -16,13 +16,13 @@ class Test(unittest.TestCase):
         ls.connect(host,user,password,database)
         assert ls.con is not None
 
+    def test_initial_guess(self):
+        print ls.initial_guess()
+
     def test_least_squares(self):
-        a = [1,2,3,4,5]
-        b = [3,7,12,9,8]
-        c = [0,-3,1,1,1]
-        assert ls._least_squares(a,b) == 144
-        assert ls._least_squares(a,a) == 0
-        assert ls._least_squares(a,c) == 55
+        truth = {'s1':3,'s2':5,'s3':3.3}
+        sim = {'s1':1,'s2':4,'s3':4}
+        print ls._least_squares(truth,sim)
 
     def test_get_sim_single_fix(self):
         self.assertEqual(ls._get_sim_single_fix(1,0),{1: '3.4', 2: '5.5', 3: '10'})

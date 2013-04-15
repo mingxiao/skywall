@@ -1,3 +1,7 @@
 The project file for Skywall.
 We will implement a python program that will communicate with the
 Lutron skywall.
+
+
+STATUS
+So far we won't know the data structures we will be using, so modularize everything. We'll most likely be using a hash (dictionary),so lets write code under that assumption.
