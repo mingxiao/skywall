@@ -35,13 +35,28 @@ def _get_sensors():
     """
     returns a list of sensors
     """
-    return [1,2,3]
+    return ['s1','s2','s3']
 
 def _get_dimlvl():
     """
     Return a list of valid dimming levels
     """
     return [0,10,20,30]
+
+def _get_fixtures():
+    """
+    Returns a list of fixtues.
+    """
+    return ['f1','f2','f3']
+
+def _sensor_type():
+    return type(_get_sensors()[0])
+
+def _fixture_type():
+    return type(_get_fixtures()[0])
+
+def _dimlvl_type():
+    return type(_get_dimlvl()[0])
 
 def connect(host,usr,upass, db):
     global con
@@ -50,8 +65,6 @@ def connect(host,usr,upass, db):
 def _get_sim_value(fid, sid, diml):
     global con
     assert con is not None
-    assert fid >= 0
-    assert sid >= 0
     assert diml >= 0
     """
     Get the SIMULATED sensor value of sensor sid when fixture fid is at dimming level diml
@@ -61,7 +74,7 @@ def _get_sim_value(fid, sid, diml):
     @param diml - dimming level, int
     """
     try:
-        con.query('select s%s from F%s_SIM where diml = %s'%(sid,fid,diml))
+        con.query('select %s from %s_SIM where diml = %s'%(sid,str.upper(fid),diml))
         result = con.use_result()
         return result.fetch_row()[0][0]
     except _mysql.ProgrammingError:
@@ -84,15 +97,14 @@ def _least_squares(truth, simul):
     
 def initial_guess():
     """
-    Returns the inital configuration guess. Do not know the form of the
-    configuration yet. Probably a dictionary
+    Returns the inital fixture configuration, mapping from fixtureID --> dimming level
     """
-    sensors = _get_sensors()
+    fixtures = _get_fixtures()
     dim = _get_dimlvl()
     config = {}
-    for sen in sensors:
+    for fix in fixtures:
         ridx = random.randint(0,len(dim)-1)
-        config[sen] = dim[ridx]
+        config[fix] = dim[ridx]
     return config
 
 def within_tol(config,ideal, tol):
@@ -103,6 +115,7 @@ def within_tol(config,ideal, tol):
     :ideal -dictionary
     :tol - float
     """
+    assert type(config) == type(ideal)
     lsq = _least_squares(config,ideal)
     return lsq <= tol
 
@@ -156,17 +169,65 @@ def _sum_sensor_readings(sreadings):
         d[sensor] = sval
     return d
 
-def get_truth(fix_level):
+def form_query(fix_config,angle, tablename='global_truth'):
+    """
+    Given the fixture configuration we will form the query
+    Select <all sensor readings> from tablename where <f1,f2,...,fn> matches fix_config and
+    angle == this.angle
+    """
+    assert angle > 0
+    assert angle < 360
+    query = 'select '
+    for sensor in _get_sensors():
+        query += '%s,'%sensor
+    query = query[:-1] #remove ending comma
+    query += ' from %s where '%tablename
+    for fixture in _get_fixtures():
+        query += '%s=%s and '%(fixture,fix_config[fixture])
+    #query = query[:-4] #remove last 'and'
+    query += 'angle=%s;'%angle
+    return query
+
+def get_truth(fix_level, angle):
     """
     Given a dictionary mapping from fixtureID --> Dimming Level, return the sensor reading
-    for each sensor.
-    """
-    pass
+    for each sensor, as an ordered list of floats
 
-def cost(fix_config,ideal):
+    There are 11^88 possible combos, if our fix_level is not in our truth table, do we simply
+    assert an error?
+
+    We assume that configuration is in our truth table! We have to have this assumption, that's
+    what we are solving for!
+    Assume we have one global truth table. (might have to split up later)
+    
+    f1| f2| ...| fn| s1| s2| ...| sn| angle| timestamp
+
+    Using our current test database, we have
+    | f1   | f2   | f3   | s1   | s2   | s3   | angle | time                |
+    +------+------+------+------+------+------+-------+---------------------+
+    |   10 |   20 |    0 | 1.34 | 5.55 |   20 |    60 | 2013-04-15 12:46:25 |
+    """
+    global con
+    q = form_query(fix_level,angle)
+    con.query(q)
+    result = con.use_result()
+    ans = result.fetch_row(how=1) #get result as a dictionary
+    print ans, len(ans)
+    if len(ans) > 0:
+        return ans[0]
+    else:
+        #no record found
+        raise Exception('No record found')
+
+def cost(fix_config,truth,angle):
     """
     Returns the cost of fixture configuration config, mapping from fixtureID --> dimming level
     The cost is the least squares of the simulated values from the ground truth
+
+    :fix_config - dictionary mapping from str --> {str --> float}
+    :angle - double
+
+    What is 'ideal'? 
     """
     global configType
     assert type(fix_config) == configType
@@ -174,9 +235,9 @@ def cost(fix_config,ideal):
     sim_values = _get_sim_all_fix(fix_config)
     #sum over all fixtures, simulated values
     sim_sum = _sum_sensor_readings(sim_values)
-    #get the ground truth sensor readings
+    #get the ground truth sensor reading
     #output least squares
-    raise NotImplementedError
+    return _least_squares(sim_sum, truth)
 
 def best_neighbor(nbors, ideal):
     """
