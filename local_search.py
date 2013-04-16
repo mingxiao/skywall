@@ -63,22 +63,29 @@ def connect(host,usr,upass, db):
     con = _mysql.connect(host,usr,upass,db)
 
 def _get_sim_value(fid, sid, diml):
-    global con
-    assert con is not None
-    assert diml >= 0
     """
-    Get the SIMULATED sensor value of sensor sid when fixture fid is at dimming level diml
+    Get the SIMULATED sensor value of sensor sid when fixture fid is at dimming level diml.
+    Returns a float
 
     @param fid - fixture id, int
     @parad sid - sensor id, int
     @param diml - dimming level, int
     """
+    global con
+    assert con is not None
+    assert diml >= 0
+    assert type(fid) == str
+    assert type(sid) == str
     try:
         con.query('select %s from %s_SIM where diml = %s'%(sid,str.upper(fid),diml))
         result = con.use_result()
-        return result.fetch_row()[0][0]
+        ans = result.fetch_row()
+        return float(ans[0][0]) #result should be float
     except _mysql.ProgrammingError:
         raise _mysql.ProgrammingError, 'Query malformed, check table name'
+    except IndexError:
+        raise Exception("IndexError make sure table %s_SIM exists and has values for dimming level %s"
+                        %(str.upper(fid),diml))
 
 def _least_squares(truth, simul):
     """    
@@ -89,10 +96,12 @@ def _least_squares(truth, simul):
     """
     assert type(truth) == type(simul)
     assert type(truth) == type({})
-    lsq = 0
+    lsq = 0.0
     for key in truth.iterkeys():
         assert key in simul
-        lsq += math.pow(truth[key] - simul[key],2)
+        assert type(truth[key] == float) or type(truth[key] == int)
+        assert type(simul[key] == float) or type(simul[key] == int)
+        lsq =lsq + math.pow(float(truth[key]) - float(simul[key]),2)
     return lsq
     
 def initial_guess():
@@ -163,13 +172,13 @@ def _sum_sensor_readings(sreadings):
     d ={}
     val = 0
     for sensor in sensors:
-        sval = 0
+        sval = 0.0
         for fixtures in sreadings.iterkeys():
-            sval += sreadings[fixtures].get(sensor,0)
+            sval += float(sreadings[fixtures].get(sensor,0))
         d[sensor] = sval
     return d
 
-def form_query(fix_config,angle, tablename='global_truth'):
+def form_query(sid,angle, tablename='truth'):
     """
     Given the fixture configuration we will form the query
     Select <all sensor readings> from tablename where <f1,f2,...,fn> matches fix_config and
@@ -181,39 +190,36 @@ def form_query(fix_config,angle, tablename='global_truth'):
     for sensor in _get_sensors():
         query += '%s,'%sensor
     query = query[:-1] #remove ending comma
-    query += ' from %s where '%tablename
-    for fixture in _get_fixtures():
-        query += '%s=%s and '%(fixture,fix_config[fixture])
-    #query = query[:-4] #remove last 'and'
-    query += 'angle=%s;'%angle
+    query += ' from %s where id=%s and angle=%s;'%(tablename,sid,angle)
     return query
 
-def get_truth(fix_level, angle):
+def get_truth(sid, angle):
     """
     Given a dictionary mapping from fixtureID --> Dimming Level, return the sensor reading
-    for each sensor, as an ordered list of floats
-
-    There are 11^88 possible combos, if our fix_level is not in our truth table, do we simply
-    assert an error?
+    for each sensor, as a dictionary
 
     We assume that configuration is in our truth table! We have to have this assumption, that's
     what we are solving for!
     Assume we have one global truth table. (might have to split up later)
     
-    f1| f2| ...| fn| s1| s2| ...| sn| angle| timestamp
+    ID (primary)| s1| s2| ...| sn| angle| timestamp
 
     Using our current test database, we have
-    | f1   | f2   | f3   | s1   | s2   | s3   | angle | time                |
-    +------+------+------+------+------+------+-------+---------------------+
-    |   10 |   20 |    0 | 1.34 | 5.55 |   20 |    60 | 2013-04-15 12:46:25 |
+    
+    | id | s1   | s2   | s3   | angle | time                |
+    +----+------+------+------+-------+---------------------+
+    |  1 | 1.34 | 5.55 |   20 |    60 | 2013-04-15 14:16:57 |
+
+    get_truth(1,60) --> {'s1':'1.34'
     """
     global con
-    q = form_query(fix_level,angle)
+    q = form_query(sid,angle)
     con.query(q)
     result = con.use_result()
     ans = result.fetch_row(how=1) #get result as a dictionary
-    print ans, len(ans)
     if len(ans) > 0:
+        for key in ans[0]:
+            ans[0][key] = float(ans[0][key]) #convert to float, as is expected.
         return ans[0]
     else:
         #no record found
@@ -226,8 +232,6 @@ def cost(fix_config,truth,angle):
 
     :fix_config - dictionary mapping from str --> {str --> float}
     :angle - double
-
-    What is 'ideal'? 
     """
     global configType
     assert type(fix_config) == configType
@@ -235,8 +239,6 @@ def cost(fix_config,truth,angle):
     sim_values = _get_sim_all_fix(fix_config)
     #sum over all fixtures, simulated values
     sim_sum = _sum_sensor_readings(sim_values)
-    #get the ground truth sensor reading
-    #output least squares
     return _least_squares(sim_sum, truth)
 
 def best_neighbor(nbors, ideal):
