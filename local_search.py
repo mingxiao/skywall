@@ -14,15 +14,12 @@ For testing and development purposes we can setup dummy tables.
 
 
 TODO:
-What is the structure of the configurations? List, dictionary?
-Configurations are dictionaries that map from fixtureID --> Dimming Level
-
-We have no guarantee on the numbering of the fixtureID, so we need a non-constrainted
-way of getting values.
+Implement logging of output and search
 """
 import _mysql
 import math
 import random
+import datetime
 
 host = 'localhost'
 user = 'root'
@@ -30,6 +27,13 @@ userpass = 'rootiam'
 db = 'test'
 con = None
 configType = dict
+
+def time_string():
+    """
+    Returns th current itme as a string in the format
+    <YEAR>_<MONTH>_<DAY>_<HOUR>_<MINUTE>_<SECOND>
+    """
+    return datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 
 def _get_sensors():
     """
@@ -128,13 +132,27 @@ def within_tol(config,ideal, tol):
     lsq = _least_squares(config,ideal)
     return lsq <= tol
 
-def neighbors(config):
+def neighbors(config,tol):
     """
-    Returns the neighbors of configuration config.
+    Returns a generator containing neighbors of configuration config, that are within a certain
+    tolerance
 
     Should make this an iterator, since the list might be larger.
+    config: dictionary (string --> float)
+    tol: float
     """
-    raise NotImplementedError
+    fixtures = _get_fixtures()
+    dimlvls = _get_dimlvl()
+    #for each fixture we iterate through all the setting that are within the
+    #tolerance of the current fixture level
+    for f in fixtures:
+        for d in dimlvls:
+            if config[f] != d:
+                if abs(config[f]-d)<=tol:
+                    tmp = config.copy()
+                    tmp[f] = d
+                    yield tmp
+        
 
 def _get_sim_single_fix(fix_id, diml):
     """
@@ -195,8 +213,8 @@ def form_query(sid,angle, tablename='truth'):
 
 def get_truth(sid, angle):
     """
-    Given a dictionary mapping from fixtureID --> Dimming Level, return the sensor reading
-    for each sensor, as a dictionary
+    Given the id of our ground truth and the angle, we return a dictionary
+    consisting of sensor readings
 
     We assume that configuration is in our truth table! We have to have this assumption, that's
     what we are solving for!
@@ -210,7 +228,7 @@ def get_truth(sid, angle):
     +----+------+------+------+-------+---------------------+
     |  1 | 1.34 | 5.55 |   20 |    60 | 2013-04-15 14:16:57 |
 
-    get_truth(1,60) --> {'s1':'1.34'
+    get_truth(1,60) --> {'s1':1.34, 's2':5.55, 's3':20.0,}
     """
     global con
     q = form_query(sid,angle)
@@ -225,7 +243,7 @@ def get_truth(sid, angle):
         #no record found
         raise Exception('No record found')
 
-def cost(fix_config,truth,angle):
+def cost(fix_config,truth):
     """
     Returns the cost of fixture configuration config, mapping from fixtureID --> dimming level
     The cost is the least squares of the simulated values from the ground truth
@@ -249,16 +267,49 @@ def best_neighbor(nbors, ideal):
     mcost = 10000000 #min cost, initially some arbitrary high number
     mbor = {} # the best neighbor
     for nbor in nbors:
-        cost = cost(nbors,ideal)
-        if cost < mcost:
-            mcost = cost
+        #print 'NBOR',nbor,type(nbor)
+        tcost = cost(nbor,ideal)
+        if tcost < mcost:
+            mcost = tcost
             mbor = nbor
+    #print 'BEST',mbor
     return mbor
+
+def log(fid,output):
+    """
+    Given a file descriptor, fid, write output to it appended with a new line.
+    """
+    fid.write("{0}\n".format(output))
+    fid.flush()
+
+def local_search(tol = 200):
+    """
+    Full local search algorithm
+    """
+    print 'LS ========='
+    #fname = 'log_{}.txt'.format(time_string())
+    #fid = open(fname,'a')
+    config = initial_guess()
+    truth = get_truth(1,60)
+    print 'GUESS',config
+    print 'TRUTH',truth
+    tcost = cost(config,truth)
+    assert tcost > 0
+    while tcost >= tol:
+        neighs = neighbors(config,tol)
+        next_config = best_neighbor(neighs,truth)
+        tcost = cost(next_config,truth)
+        print 'NEXT',next_config,tcost
+        if config == next_config:
+            #stuck at minima
+            raise Exception('Stuck in minima at {}'.format(config))
+        config = next_config
+    return config
 
 if __name__ == '__main__':
     connect(host,user,userpass,db)
-    print con
-    print _get_sim_value(1,2,0)
+    #print con
+    #print _get_sim_value(1,2,0)
 
 
 

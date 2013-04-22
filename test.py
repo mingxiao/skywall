@@ -17,7 +17,7 @@ class Test(unittest.TestCase):
         assert ls.con is not None
 
     def test_initial_guess(self):
-        print ls.initial_guess()
+        guess= ls.initial_guess()
 
     def test_least_squares(self):
         truth = {'s1':3,'s2':5,'s3':3.3}
@@ -27,12 +27,14 @@ class Test(unittest.TestCase):
     def test_get_sim_values(self):
         self.assertEqual(ls._get_sim_value('f1','s1',10),4.1)
         self.assertEqual(ls._get_sim_value('f3','s2',0),.001)
+        self.assertEqual(ls._get_sim_value('f2','s3',30), 22)
 
     def test_get_sim_single_fix(self):
         self.assertEqual(ls._get_sim_single_fix('f1',0),{'s1': 3.4, 's2': 5.5, 's3': 10.0})
-
+        self.assertEqual(ls._get_sim_single_fix('f3',10),{'s1': 1.43, 's2': 0.011, 's3': 5})
+        
     def test_get_sim_all_fix(self):
-        d = {'f1':0,'f2':10}
+        d = {'f1':0,'f2':10,'f3':20}
         ans = ls._get_sim_all_fix(d)
         for key,val in ans.iteritems():
             assert type(val) == dict
@@ -66,8 +68,39 @@ class Test(unittest.TestCase):
         truth = ls.get_truth(1,60)
         self.assertEqual(truth,{'s1':1.34,'s2':5.55,'s3':20})
         fconfig = {'f1':10,'f2':20,'f3':0}
-        print 'COST',ls.cost(fconfig,truth,60)
-        #TODO make sure cost works with deliberate values
+        cost = int(ls.cost(fconfig,truth))
+        self.assertEqual(cost,427)
+        #s = '{}, {}'.format(fconfig,cost)
+        # s
+ 
+    def test_neighbors(self):
+        config = {'f1':0,'f2':10,'f3':20}
+        #print config
+        tol = 10
+        gener=ls.neighbors(config,tol)
+        for t in gener:
+            #make sure we are within the tolerance
+            for key in t.iterkeys():
+                self.assertTrue( abs(t[key] - config[key]) <= tol)
+
+    def test_log(self):
+        fid = open('tmp.txt','a')
+        ls.log(fid,'hello')
+        ls.log(fid,'world')
+        pass
+
+    def test_best_neighbor(self):
+        config = {'f1':0,'f2':10,'f3':20}
+        #print config
+        tol = 10
+        gener=ls.neighbors(config,tol)
+        ideal = {'s1':1.1,'s2':15,'s3':10}
+        #print 'BEST',ls.best_neighbor(gener,ideal)
+
+    
+    def test_local_search(self):
+        #ls.local_search()
+        pass
 
 if __name__ == '__main__':
     unittest.main()
