@@ -287,22 +287,28 @@ def local_search(tol = 200):
     Full local search algorithm
     """
     print 'LS ========='
-    #fname = 'log_{}.txt'.format(time_string())
-    #fid = open(fname,'a')
+    fname = 'log_{}.txt'.format(time_string())
+    fid = open(fname,'a')
     config = initial_guess()
     truth = get_truth(1,60)
-    print 'GUESS',config
-    print 'TRUTH',truth
+    log(fid,'TRUTH, {}, {}'.format(truth,tol))
     tcost = cost(config,truth)
+    log(fid,'GUESS, {}, {}'.format(config,tcost))
     assert tcost > 0
     while tcost >= tol:
         neighs = neighbors(config,tol)
         next_config = best_neighbor(neighs,truth)
-        tcost = cost(next_config,truth)
-        print 'NEXT',next_config,tcost
-        if config == next_config:
-            #stuck at minima
-            raise Exception('Stuck in minima at {}'.format(config))
+        nextcost = cost(next_config,truth)
+        #check to make sure the next one is better than the current
+        print nextcost, tcost
+        if nextcost < tcost:
+            tcost = nextcost
+            config = next_config
+            log(fid,'GUESS, {}, {}'.format(config,tcost))
+        else:
+            print 'Local minima at {}'.format(config)
+            log(fid,'MINIMA, {},{}'.format(config,tcost))
+            return
         config = next_config
     return config
 

@@ -39,11 +39,15 @@ class Test(unittest.TestCase):
         for key,val in ans.iteritems():
             assert type(val) == dict
             assert type(key) == str
-            #TODO something substantial
+        self.assertEqual(ans['f1'],{'s3': 10.0, 's2': 5.5, 's1': 3.4})
+        self.assertEqual(ans['f2'], {'s3': 9.0, 's2': 13.0, 's1': 1.0})
+        self.assertEqual(ans['f3'], {'s3': 15.0, 's2': 0.9011, 's1': 5.43})
 
     def test_sum_sensor_readings(self):
-        config = {'f1':{'s1':10,'s2':20,'s3':30},'f2':{'s1':3,'s2':7,'s3':1}}
-        self.assertEqual(ls._sum_sensor_readings(config),{'s1':13,'s2':27,'s3':31})
+        d = {'f1':0,'f2':10,'f3':20}
+        ans = ls._get_sim_all_fix(d)
+        #config = {'f1':{'s1':10,'s2':20,'s3':30},'f2':{'s1':3,'s2':7,'s3':1}}
+        self.assertEqual(ls._sum_sensor_readings(ans),{'s1':9.83,'s2':19.4011,'s3':34.0})
 
     def test_within_tol(self):
         sensor_sim = {'s1':2.88, 's2':0.00, 's3':10}
@@ -99,7 +103,7 @@ class Test(unittest.TestCase):
 
     
     def test_local_search(self):
-        #ls.local_search()
+        ls.local_search(20)
         pass
 
 if __name__ == '__main__':
