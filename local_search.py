@@ -14,7 +14,7 @@ For testing and development purposes we can setup dummy tables.
 
 
 TODO:
-Implement logging of output and search
+All implemented, now to test with real or close-to-real values
 """
 import _mysql
 import math
@@ -71,8 +71,8 @@ def _get_sim_value(fid, sid, diml):
     Get the SIMULATED sensor value of sensor sid when fixture fid is at dimming level diml.
     Returns a float
 
-    @param fid - fixture id, int
-    @parad sid - sensor id, int
+    @param fid - fixture id, string
+    @parad sid - sensor id, string
     @param diml - dimming level, int
     """
     global con
@@ -81,15 +81,14 @@ def _get_sim_value(fid, sid, diml):
     assert type(fid) == str
     assert type(sid) == str
     try:
-        con.query('select %s from %s_SIM where diml = %s'%(sid,str.upper(fid),diml))
+        con.query('select {} from {} where diml = {}'.format(sid,fid,diml))
         result = con.use_result()
         ans = result.fetch_row()
         return float(ans[0][0]) #result should be float
     except _mysql.ProgrammingError:
         raise _mysql.ProgrammingError, 'Query malformed, check table name'
     except IndexError:
-        raise Exception("IndexError make sure table %s_SIM exists and has values for dimming level %s"
-                        %(str.upper(fid),diml))
+        raise Exception("IndexError make sure table {} exists and has values for dimming level {}".format(f1,diml))
 
 def _least_squares(truth, simul):
     """    
@@ -196,7 +195,7 @@ def _sum_sensor_readings(sreadings):
         d[sensor] = sval
     return d
 
-def form_query(sid,angle, tablename='truth'):
+def form_query(sid tablename='truth'):
     """
     Given the fixture configuration we will form the query
     Select <all sensor readings> from tablename where <f1,f2,...,fn> matches fix_config and
@@ -208,12 +207,12 @@ def form_query(sid,angle, tablename='truth'):
     for sensor in _get_sensors():
         query += '%s,'%sensor
     query = query[:-1] #remove ending comma
-    query += ' from %s where id=%s and angle=%s;'%(tablename,sid,angle)
+    query += ' from %s where id=%s;'%(tablename,sid)
     return query
 
-def get_truth(sid, angle):
+def get_truth(sid):
     """
-    Given the id of our ground truth and the angle, we return a dictionary
+    Given the id of our ground truth, we return a dictionary
     consisting of sensor readings
 
     We assume that configuration is in our truth table! We have to have this assumption, that's
@@ -228,10 +227,10 @@ def get_truth(sid, angle):
     +----+------+------+------+-------+---------------------+
     |  1 | 1.34 | 5.55 |   20 |    60 | 2013-04-15 14:16:57 |
 
-    get_truth(1,60) --> {'s1':1.34, 's2':5.55, 's3':20.0,}
+    get_truth(1) --> {'s1':1.34, 's2':5.55, 's3':20.0,}
     """
     global con
-    q = form_query(sid,angle)
+    q = form_query(sid)
     con.query(q)
     result = con.use_result()
     ans = result.fetch_row(how=1) #get result as a dictionary
@@ -249,7 +248,7 @@ def cost(fix_config,truth):
     The cost is the least squares of the simulated values from the ground truth
 
     :fix_config - dictionary mapping from str --> {str --> float}
-    :angle - double
+    :truth - dictionary mapping from str --> float
     """
     global configType
     assert type(fix_config) == configType
@@ -290,7 +289,7 @@ def local_search(tol = 200):
     fname = 'log_{}.txt'.format(time_string())
     fid = open(fname,'a')
     config = initial_guess()
-    truth = get_truth(1,60)
+    truth = get_truth(1)
     log(fid,'TRUTH, {}, {}'.format(truth,tol))
     tcost = cost(config,truth)
     log(fid,'GUESS, {}, {}'.format(config,tcost))
