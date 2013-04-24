@@ -57,19 +57,17 @@ class Test(unittest.TestCase):
 
     def test_form_query(self):
         fix_config = 1
-        angle = 60
-        ans = 'select s1,s2,s3 from truth where id=1 and angle=60;'
-        self.assertEqual(ls.form_query(fix_config,angle),ans)
+        ans = 'select s1,s2,s3 from truth where id=1;'
+        self.assertEqual(ls.form_query(fix_config),ans)
 
     def test_get_truth(self):
         fix_config = 1
-        angle = 60
-        r = ls.get_truth(fix_config,angle)
+        r = ls.get_truth(fix_config)
         self.assertEqual(r,{'s1':1.34,'s2':5.55,'s3':20.0})
         #self.assertRaises(Exception('No record found'),ls.get_truth(fix_config,90))
 
     def test_cost(self):
-        truth = ls.get_truth(1,60)
+        truth = ls.get_truth(1)
         self.assertEqual(truth,{'s1':1.34,'s2':5.55,'s3':20})
         fconfig = {'f1':10,'f2':20,'f3':0}
         cost = int(ls.cost(fconfig,truth))

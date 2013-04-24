@@ -195,14 +195,12 @@ def _sum_sensor_readings(sreadings):
         d[sensor] = sval
     return d
 
-def form_query(sid tablename='truth'):
+def form_query(sid, tablename='truth'):
     """
     Given the fixture configuration we will form the query
     Select <all sensor readings> from tablename where <f1,f2,...,fn> matches fix_config and
     angle == this.angle
     """
-    assert angle > 0
-    assert angle < 360
     query = 'select '
     for sensor in _get_sensors():
         query += '%s,'%sensor
