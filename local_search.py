@@ -14,17 +14,18 @@ For testing and development purposes we can setup dummy tables.
 
 
 TODO:
-All implemented, now to test with real or close-to-real values
+non-trivial experimental data inputted. now for testing
 """
 import _mysql
 import math
 import random
 import datetime
 
-host = 'localhost'
-user = 'root'
-userpass = 'rootiam'
-db = 'test'
+#host = 'localhost'
+#user = 'root'
+#userpass = 'rootiam'
+#db = 'test'
+#db = 'realtest'
 con = None
 configType = dict
 
@@ -39,19 +40,22 @@ def _get_sensors():
     """
     returns a list of sensors
     """
-    return ['s1','s2','s3']
+    return sensors = ['s{}'.format(i) for i in range(1,14)]
+    #return ['s1','s2','s3']
 
 def _get_dimlvl():
     """
     Return a list of valid dimming levels
     """
-    return [0,10,20,30]
+    return [0,10,20,30,40,50,60,70,80,90]
+    #return [0,10,20,30]
+
 
 def _get_fixtures():
     """
     Returns a list of fixtues.
     """
-    return ['f1','f2','f3']
+    return ['f{}'.format(i) for i in range(1,89)]
 
 def _sensor_type():
     return type(_get_sensors()[0])
@@ -279,15 +283,18 @@ def log(fid,output):
     fid.write("{0}\n".format(output))
     fid.flush()
 
-def local_search(tol = 200):
+def local_search(cid = 1,tol = 200):
     """
     Full local search algorithm
+
+    cid - configuration id , int
+    tol - tolerance, int
     """
     print 'LS ========='
     fname = 'log_{}.txt'.format(time_string())
     fid = open(fname,'a')
     config = initial_guess()
-    truth = get_truth(1)
+    truth = get_truth(cid)
     log(fid,'TRUTH, {}, {}'.format(truth,tol))
     tcost = cost(config,truth)
     log(fid,'GUESS, {}, {}'.format(config,tcost))
@@ -310,9 +317,10 @@ def local_search(tol = 200):
     return config
 
 if __name__ == '__main__':
-    connect(host,user,userpass,db)
+    #connect(host,user,userpass,db)
     #print con
     #print _get_sim_value(1,2,0)
+    pass
 
 
 

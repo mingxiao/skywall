@@ -11,7 +11,50 @@ angles = [(180/13)*i for i in range(13)]
 sensors = ['s{}'.format(i) for i in range(1,14)]
 smin = 0 #min sensor reading
 smax = 10000 #max sensor reading
-maxid = 169  #max number of configurations
+maxid = 169  #max number of configurations()
+
+host = 'localhost'
+user = 'root'
+password = 'rootiam'
+db = 'realtest'
+con = None
+
+def connect(host,usr,upass,db):
+    global con
+    con = _mysql.connect(host,usr,upass,db)
+
+def make_fixtablequery(name):
+    """
+    create table <name> (int dim primary key, s1 float,...,s13 float);
+    """
+    var = 'dim int primary key,'
+    for s in sensors:
+        var += '{} float,'.format(s)
+    var = var[:-1]
+    query = 'CREATE TABLE {} ({});'.format(name,var)
+    return query
+    pass
+
+def create_truthtable(truth):
+    var = 'id int primary key,'
+    for s in sensors:
+        var += '{} float,'.format(s)
+    var += 'angle float'
+    q = 'create table if not exists {} ({});'.format(truth,var)
+    global con
+    con.query(q)
+
+def insertcsv(csv,tablename):
+    q= "load data local infile '{}' into table {} fields terminated by ',';".format(csv,
+                                                                                   tablename)
+    print q
+    global con
+    con.query(q)
+    
+def make_ftable(name):
+    global con
+    q = make_fixtablequery(name)
+    con.query(q)
 
 def fixture_data(fname):
     fid = open(fname,'w')
