@@ -101,7 +101,7 @@ class Test(unittest.TestCase):
 
     
     def test_local_search(self):
-        ls.local_search(20)
+        ls.local_search(1)
         pass
 
 if __name__ == '__main__':

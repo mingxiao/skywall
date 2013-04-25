@@ -19,6 +19,7 @@ non-trivial experimental data inputted. now for testing
 import _mysql
 import math
 import random
+import sys
 import datetime
 
 #host = 'localhost'
@@ -40,7 +41,7 @@ def _get_sensors():
     """
     returns a list of sensors
     """
-    return sensors = ['s{}'.format(i) for i in range(1,14)]
+    return ['s{}'.format(i) for i in range(1,14)]
     #return ['s1','s2','s3']
 
 def _get_dimlvl():
@@ -55,6 +56,7 @@ def _get_fixtures():
     """
     Returns a list of fixtues.
     """
+    #return ['f1','f2','f3']
     return ['f{}'.format(i) for i in range(1,89)]
 
 def _sensor_type():
@@ -85,7 +87,7 @@ def _get_sim_value(fid, sid, diml):
     assert type(fid) == str
     assert type(sid) == str
     try:
-        con.query('select {} from {} where diml = {}'.format(sid,fid,diml))
+        con.query('select {} from {} where dim = {}'.format(sid,fid,diml))
         result = con.use_result()
         ans = result.fetch_row()
         return float(ans[0][0]) #result should be float
@@ -135,7 +137,7 @@ def within_tol(config,ideal, tol):
     lsq = _least_squares(config,ideal)
     return lsq <= tol
 
-def neighbors(config,tol):
+def neighbors(config,tol=20):
     """
     Returns a generator containing neighbors of configuration config, that are within a certain
     tolerance
@@ -150,11 +152,15 @@ def neighbors(config,tol):
     #tolerance of the current fixture level
     for f in fixtures:
         for d in dimlvls:
-            if config[f] != d:
-                if abs(config[f]-d)<=tol:
-                    tmp = config.copy()
-                    tmp[f] = d
-                    yield tmp
+            try:
+                if config[f] != d:
+                    if abs(config[f]-d)<=tol:
+                        tmp = config.copy()
+                        tmp[f] = d
+                        yield tmp
+            except Exception, e:
+                print config,e
+                raise Exception('key error! What?')
         
 
 def _get_sim_single_fix(fix_id, diml):
@@ -233,6 +239,7 @@ def get_truth(sid):
     """
     global con
     q = form_query(sid)
+    print 'QUERY',q
     con.query(q)
     result = con.use_result()
     ans = result.fetch_row(how=1) #get result as a dictionary
@@ -264,8 +271,11 @@ def best_neighbor(nbors, ideal):
     """
     Returns the best (lowest cost) neighbor from a collection of neighbors nbors
     when compared against ideal
+
+    ERROR: in our setup the initial mcost is lower then all the other
+    neighbors!
     """
-    mcost = 10000000 #min cost, initially some arbitrary high number
+    mcost = float('inf') #min cost, initially some arbitrary high number
     mbor = {} # the best neighbor
     for nbor in nbors:
         #print 'NBOR',nbor,type(nbor)
@@ -274,21 +284,24 @@ def best_neighbor(nbors, ideal):
             mcost = tcost
             mbor = nbor
     #print 'BEST',mbor
+    if mbor == {}:
+        raise Exception('No neighbors were less than sys.maxint!')
     return mbor
 
 def log(fid,output):
     """
     Given a file descriptor, fid, write output to it appended with a new line.
     """
-    fid.write("{0}\n".format(output))
+    fid.write("{}\n".format(output))
     fid.flush()
 
-def local_search(cid = 1,tol = 200):
+def local_search(cid = 1,tol = 200, stol = 20):
     """
     Full local search algorithm
 
     cid - configuration id , int
     tol - tolerance, int
+    stol - neighborhood search tolerance, int
     """
     print 'LS ========='
     fname = 'log_{}.txt'.format(time_string())
@@ -300,7 +313,8 @@ def local_search(cid = 1,tol = 200):
     log(fid,'GUESS, {}, {}'.format(config,tcost))
     assert tcost > 0
     while tcost >= tol:
-        neighs = neighbors(config,tol)
+        print 'CURRENT',config
+        neighs = neighbors(config,stol)
         next_config = best_neighbor(neighs,truth)
         nextcost = cost(next_config,truth)
         #check to make sure the next one is better than the current
