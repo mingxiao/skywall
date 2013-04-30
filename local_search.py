@@ -305,7 +305,8 @@ def local_search(cid = 1,tol = 200, stol = 20):
     """
     print 'LS ========='
     fname = 'log_{}.txt'.format(time_string())
-    fid = open(fname,'a')
+    fpath = os.path.join(os.getcwd(),'log',fname)
+    fid = open(fpath,'a')
     config = initial_guess()
     truth = get_truth(cid)
     log(fid,'TRUTH, {}, {}'.format(truth,tol))
