@@ -1,7 +1,8 @@
 """
 TODO:
-1. Implement the area command
-2. Turn all lights on at once faster
+Turn all lights on at once faster.
+
+Can we execute multiple commands simultaneously through telnet?
 """
 import telnetlib
 import argparse
@@ -13,7 +14,7 @@ class MyTelnetController:
 
     Modified to fit our needs
     """
-    def __init__(self,host,username,prompt,end):
+    def __init__(self,host,username,prompt,end,port=23):
         """
         Constructor. For the Lutron QSE-CI-NWK-E, we do not need a password
             
@@ -29,13 +30,14 @@ class MyTelnetController:
         self.PROMPT=prompt
         self.END=end
         self.TN = None
+        self.PORT=port
 
     def login(self):
         """
         Login to Lutron Hub via telnet
         """
         try:
-            self.tn = telnetlib.Telnet(self.HOST)
+            self.tn = telnetlib.Telnet(self.HOST,self.PORT  )
             self.tn.read_until('login: ') #this should always appear
             self.tn.write(self.USER +self.END) #how can we check for correct username?
             self.tn.read_until('connection established') #should appear if connection successful
