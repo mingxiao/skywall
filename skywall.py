@@ -1,12 +1,7 @@
-"""
-TODO:
-Turn all lights on at once faster.
-
-Can we execute multiple commands simultaneously through telnet?
-"""
 import telnetlib
 import argparse
 import re
+import os
 
 class MyTelnetController:
     """
@@ -57,8 +52,33 @@ class MyTelnetController:
         return self.execute(cmd)
 
     def get_level(self,light_id):
+        """
+        Get the current light level of fixture light_id
+
+        light_id - id of light fixture, int
+        """
         cmd = '?output,%s,1'%light_id
         return self.execute(cmd)
+
+    def read_file(self,fpath,fstart = 3):
+        """
+        Read file containing light levels (one per line) and sets
+        the fixtures to them in a sequential manner
+
+        fpath - path to input file,string
+        fstart - start fixture id, int
+        """
+        if not os.path.exists(fpath):
+            raise Exception('{} does not exists!'.format(fpath))
+        fid = open(fpath,'r')
+        i = fstart
+        for line in fid:
+            try:
+                num = int(line)
+                self.set_level(i,num)
+                i+=1
+            except Exception,e:
+                print 'EXCEPTION',e
     
     def execute(self,command):
         """
@@ -128,6 +148,7 @@ if __name__ == '__main__':
     group.add_argument('-s','--set', help='ID of light fixture to set')
     group.add_argument('-g','--get', help='ID of light fixture to get')
     group.add_argument('-a','--area',help='ID of area to set')
+    group.add_argument('-f','--file',help='File containing light levels')
     parser.add_argument('-l','--level',help='Light level to set a fixture to')
     args = parser.parse_args()
     if args.set:
@@ -147,4 +168,9 @@ if __name__ == '__main__':
         con = MyTelnetController(host,user,prompt,end)
         con.login()
         con.set_area(args.area,args.level)
+        con.logout()
+    if args.file:
+        con = MyTelnetController(host,user,prompt,end)
+        con.login()
+        con.read_file(args.file)
         con.logout()
