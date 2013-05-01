@@ -14,7 +14,8 @@ For testing and development purposes we can setup dummy tables.
 
 
 TODO:
-non-trivial experimental data inputted. now for testing
+Dont like how _get_sensors(), _get_fixtures() are hardcoded in,
+should abstract it out
 """
 import _mysql
 import math
@@ -239,7 +240,6 @@ def get_truth(sid):
     """
     global con
     q = form_query(sid)
-    print 'QUERY',q
     con.query(q)
     result = con.use_result()
     ans = result.fetch_row(how=1) #get result as a dictionary
@@ -278,12 +278,10 @@ def best_neighbor(nbors, ideal):
     mcost = float('inf') #min cost, initially some arbitrary high number
     mbor = {} # the best neighbor
     for nbor in nbors:
-        #print 'NBOR',nbor,type(nbor)
         tcost = cost(nbor,ideal)
         if tcost < mcost:
             mcost = tcost
             mbor = nbor
-    #print 'BEST',mbor
     if mbor == {}:
         raise Exception('No neighbors were less than sys.maxint!')
     return mbor
@@ -314,12 +312,10 @@ def local_search(cid = 1,tol = 200, stol = 20):
     log(fid,'GUESS, {}, {}'.format(config,tcost))
     assert tcost > 0
     while tcost >= tol:
-        print 'CURRENT',config
         neighs = neighbors(config,stol)
         next_config = best_neighbor(neighs,truth)
         nextcost = cost(next_config,truth)
         #check to make sure the next one is better than the current
-        print nextcost, tcost
         if nextcost < tcost:
             tcost = nextcost
             config = next_config
