@@ -14,8 +14,17 @@ For testing and development purposes we can setup dummy tables.
 
 
 TODO:
-Dont like how _get_sensors(), _get_fixtures() are hardcoded in,
-should abstract it out
+Dont like how _get_sensors(), _get_fixtures() are hardcoded in, should abstract it out
+
+change local_search() such that if criteria is not met with a given dimming radius, then expand that radius
+
+implement smarter initial guess using PCA. A better guess will help the search converge faster
+
+create a form_matrix() that will return a matrix as a string in the form
+
+    e1 e2 e3;
+    e4 e5 .......
+So we can pass that into numpy
 """
 import _mysql
 import math
@@ -141,7 +150,7 @@ def within_tol(config,ideal, tol):
 def neighbors(config,tol=20):
     """
     Returns a generator containing neighbors of configuration config, that are within a certain
-    tolerance
+    tolerance.
 
     Should make this an iterator, since the list might be larger.
     config: dictionary (string --> float)
@@ -283,7 +292,7 @@ def best_neighbor(nbors, ideal):
             mcost = tcost
             mbor = nbor
     if mbor == {}:
-        raise Exception('No neighbors were less than sys.maxint!')
+        raise Exception('No neighbors were less than float(inf)!')
     return mbor
 
 def log(fid,output):
@@ -307,9 +316,9 @@ def local_search(cid = 1,tol = 200, stol = 20):
     fid = open(fpath,'a')
     config = initial_guess()
     truth = get_truth(cid)
-    log(fid,'TRUTH, {}, {}'.format(truth,tol))
+    log(fid,'TRUTH | {} | {}'.format(truth,tol))
     tcost = cost(config,truth)
-    log(fid,'GUESS, {}, {}'.format(config,tcost))
+    log(fid,'GUESS | {} | {}'.format(config,tcost))
     assert tcost > 0
     while tcost >= tol:
         neighs = neighbors(config,stol)
@@ -319,11 +328,11 @@ def local_search(cid = 1,tol = 200, stol = 20):
         if nextcost < tcost:
             tcost = nextcost
             config = next_config
-            log(fid,'GUESS, {}, {}'.format(config,tcost))
+            log(fid,'GUESS | {} | {}'.format(config,tcost))
         else:
             print 'Local minima at {}'.format(config)
-            log(fid,'MINIMA, {},{}'.format(config,tcost))
-            return
+            log(fid,'MINIMA | {} | {}'.format(config,tcost))
+            return config
         config = next_config
     return config
 

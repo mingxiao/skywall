@@ -3,6 +3,7 @@ Need to facilitate reading in A and b
 """
 
 import numpy
+import mdp
 
 def solve(A,b):
     """
