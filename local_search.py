@@ -6,9 +6,10 @@ while c not within tolerance:
     n <- neighbors of c
     c <- lowest cost neighbor
 
-The configuration cost is something that was computed before-hand thus we
-cans simlpy obtain it. Haven't yet decided on the format, but it will most likely
-be a database. I elect to use mysql since labview will be using mysql as well.
+The configuration cost is something that was computed before-hand thus
+we cans simlpy obtain it. Haven't yet decided on the format, but it
+will most likely be a database. I elect to use mysql since labview
+will be using mysql as well.
 
 For testing and development purposes we can setup dummy tables.
 
@@ -16,9 +17,11 @@ For testing and development purposes we can setup dummy tables.
 TODO:
 Dont like how _get_sensors(), _get_fixtures() are hardcoded in, should abstract it out
 
-change local_search() such that if criteria is not met with a given dimming radius, then expand that radius
+change local_search() such that if criteria is not met with a given
+dimming radius, then expand that radius
 
-implement smarter initial guess using PCA. A better guess will help the search converge faster
+implement smarter initial guess using PCA. A better guess will help
+the search converge faster
 
 create a form_matrix() that will return a matrix as a string in the form
 
@@ -31,12 +34,16 @@ import math
 import random
 import sys
 import datetime
-
+import argparse
+import os
 #host = 'localhost'
 #user = 'root'
 #userpass = 'rootiam'
 #db = 'test'
 #db = 'realtest'
+fixtures = None
+sensors = None
+dimlvls = None
 con = None
 configType = dict
 
@@ -47,36 +54,55 @@ def time_string():
     """
     return datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 
-def _get_sensors():
+def _get_sensors(sensorfile):
     """
-    returns a list of sensors
+    Reads a list of sensor names from a file, one per line, and returns them as a list of strings.
     """
-    return ['s{}'.format(i) for i in range(1,14)]
-    #return ['s1','s2','s3']
+    global sensors
+    assert os.path.exists(sensorfile)
+    fid = open(sensorfile,'r')
+    slist = []
+    for line in fid.readlines():
+        line = line.strip()
+        if len(line) != 0:
+            slist.append(line)
+    sensors = slist
+    return slist
 
-def _get_dimlvl():
+def _get_dimlvl(dimfile):
     """
-    Return a list of valid dimming levels
+    Reads a file containing dimming levels, one per line, and 
+    returns a list of ints
     """
-    return [0,10,20,30,40,50,60,70,80,90]
-    #return [0,10,20,30]
+    assert os.path.exists(dimfile)
+    fid = open(dimfile,'r')
+    return [int(x.strip()) for x in fid.readlines() if len(x.strip()) > 0]
 
-
-def _get_fixtures():
+def _get_fixtures(fixturefile):
     """
     Returns a list of fixtues.
     """
-    #return ['f1','f2','f3']
-    return ['f{}'.format(i) for i in range(1,89)]
+    global fixtures
+    assert os.path.exists(fixturefile)
+    fid = open(fixturefile)
+    flist = []
+    for line in fid.readlines():
+        line = line.strip()
+        if len(line) > 0: flist.append(line)
+    fixtures = flist
+    return flist
 
 def _sensor_type():
-    return type(_get_sensors()[0])
+    global sensors
+    return type(sensors[0])
 
 def _fixture_type():
-    return type(_get_fixtures()[0])
+    global fixtures
+    return type(fixtures[0])
 
 def _dimlvl_type():
-    return type(_get_dimlvl()[0])
+    global dimlvls
+    return type(dimlvls[0])
 
 def connect(host,usr,upass, db):
     global con
@@ -85,11 +111,26 @@ def connect(host,usr,upass, db):
 def _get_sim_value(fid, sid, diml):
     """
     Get the SIMULATED sensor value of sensor sid when fixture fid is at dimming level diml.
-    Returns a float
+    Returns a float.
+    The fid is the name of the table that the record should be stored in.
 
     @param fid - fixture id, string
     @parad sid - sensor id, string
     @param diml - dimming level, int
+
+    For example, running the following on a mysql server
+    mysql> select * from f1; 
+    should yield something like:
+    
+    +------+------+------+------+
+    | dim  | s1   | s2   | s3   |
+    +------+------+------+------+
+    |    0 |  3.4 |  5.5 |   10 |
+    |   10 |  4.1 | 10.4 | 11.1 |
+    |   20 |  4.4 | 15.2 |   12 |
+    |   30 |  4.5 | 25.2 | 12.5 |
+    |   40 | NULL | NULL | NULL |
+
     """
     global con
     assert con is not None
@@ -175,8 +216,9 @@ def neighbors(config,tol=20):
 
 def _get_sim_single_fix(fix_id, diml):
     """
-    Returns a dictionary that maps from fix_id --> {sensor_id --> reading}, based
-    on the dimming level diml
+    Returns a dictionary that maps from fix_id --> {sensor_id -->
+    reading}, based on the dimming level diml. When fixture fix_id is
+    on dimming level diml, how much are the sensors affected?
     """
     sensors = _get_sensors()
     d = {}
@@ -248,6 +290,7 @@ def get_truth(sid):
     get_truth(1) --> {'s1':1.34, 's2':5.55, 's3':20.0,}
     """
     global con
+    assert con is not None
     q = form_query(sid)
     con.query(q)
     result = con.use_result()
@@ -258,7 +301,7 @@ def get_truth(sid):
         return ans[0]
     else:
         #no record found
-        raise Exception('No record found')
+        raise Exception('Ground truth no found for ID {}. Check that table/record exists and its in the rigth database'.format(sid))
 
 def cost(fix_config,truth):
     """
@@ -280,9 +323,6 @@ def best_neighbor(nbors, ideal):
     """
     Returns the best (lowest cost) neighbor from a collection of neighbors nbors
     when compared against ideal
-
-    ERROR: in our setup the initial mcost is lower then all the other
-    neighbors!
     """
     mcost = float('inf') #min cost, initially some arbitrary high number
     mbor = {} # the best neighbor
@@ -306,7 +346,7 @@ def local_search(cid = 1,tol = 200, stol = 20):
     """
     Full local search algorithm
 
-    cid - configuration id , int
+    cid - configuration id of desired ground truth , int
     tol - tolerance, int
     stol - neighborhood search tolerance, int
     """
@@ -335,11 +375,31 @@ def local_search(cid = 1,tol = 200, stol = 20):
             return config
         config = next_config
     return config
-
+#host = 'localhost'
+#user = 'root'
+#userpass = 'rootiam'
+#db = 'test'
+#db = 'realtest'
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-o','--host',help='Host machine of database',default='localhost',required=True)
+    parser.add_argument('-d','--database',help='Name of database to use',required=True)
+    parser.add_argument('-u','--username',help='username to login to database',required=True,action='store')
+    parser.add_argument('-p','--password',help='login password',required=True,action='store')
+    parser.add_argument('-g','--ground',help='The id of the ground truth',required=True,type=int)
+    parser.add_argument('-t','--tolerance',help='Tolerance for local search, once we get below the tolerance, local search ends',type=float,default=200)
+    parser.add_argument('-r','--radius',help='Radius of neighborhood to consider',type=float,default=200)
+    parser.add_argument('-f','--fixturefile',help='File containing fixtures, one per line',default='fixtures.txt')
+    parser.add_argument('-s','--sensorfile',help='File containing sensors, oen per line',default='sensors.txt')
+    parser.add_argument('-l','--dimfile',help='File containing dimming levels, one per line',default='dimlevels.txt')
+    args = parser.parse_args()
+    if args.host and args.database and args.username and args.password:
+        #connect to the database
+        connect(args.host, args.username, args.password,args.database)
+        #if database connection succeeds, then we proceed to doing local search
+        local_search(args.ground,args.tolerance, args.radius)
+        parser.exit(message= "Connection done\n")
     #connect(host,user,userpass,db)
-    #print con
-    #print _get_sim_value(1,2,0)
     pass
 
 

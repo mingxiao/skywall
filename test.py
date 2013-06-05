@@ -101,8 +101,29 @@ class Test(unittest.TestCase):
 
     
     def test_local_search(self):
-        ls.local_search(1)
+        #ls.local_search(1)
         pass
 
+    def test_get_sensors(self):
+        sfile = 'sensors.txt'
+        truth = ['s1','s2','s3','s4','s5','s6','s7','s8',
+                 's9','s10','s11','s12','s13']
+        self.assertEqual(truth, ls._get_sensors(sfile))
+        
+    def test_get_dimlvl(self):
+        dfile = 'dimlevels.txt'
+        truth = [0,10,20,30,40,50,60,70,80,90,100]
+        self.assertEqual(truth, ls._get_dimlvl(dfile))
+
+    def test_get_fixtures(self):
+        fixfile = 'fixtures.txt'
+        truth = ['f%d'%i for i in range(1,89)]
+        self.assertEqual(truth, ls._get_fixtures(fixfile))
+
 if __name__ == '__main__':
-    unittest.main()
+    basefuncs= unittest.TestSuite()
+    basefuncs.addTest(Test('test_get_sensors'))
+    basefuncs.addTest(Test('test_get_dimlvl'))
+    basefuncs.addTest(Test('test_get_fixtures'))
+    unittest.TextTestRunner().run(basefuncs)
+    #unittest.main()
