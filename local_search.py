@@ -69,14 +69,16 @@ def _get_sensors(sensorfile):
     sensors = slist
     return slist
 
-def _get_dimlvl(dimfile):
+def _get_dimlvls(dimfile):
     """
     Reads a file containing dimming levels, one per line, and 
     returns a list of ints
     """
+    global dimlvls
     assert os.path.exists(dimfile)
     fid = open(dimfile,'r')
-    return [int(x.strip()) for x in fid.readlines() if len(x.strip()) > 0]
+    dimlvls = [int(x.strip()) for x in fid.readlines() if len(x.strip()) > 0]
+    return dimlvls
 
 def _get_fixtures(fixturefile):
     """
@@ -145,7 +147,7 @@ def _get_sim_value(fid, sid, diml):
     except _mysql.ProgrammingError:
         raise _mysql.ProgrammingError, 'Query malformed, check table name'
     except IndexError:
-        raise Exception("IndexError make sure table {} exists and has values for dimming level {}".format(f1,diml))
+        raise Exception("IndexError make sure table {} exists and has values for dimming level {}".format(fid,diml))
 
 def _least_squares(truth, simul):
     """    
@@ -168,12 +170,13 @@ def initial_guess():
     """
     Returns the inital fixture configuration, mapping from fixtureID --> dimming level
     """
-    fixtures = _get_fixtures()
-    dim = _get_dimlvl()
+    global fixtures
+    global dimlvls
+    assert dimlvls is not None
     config = {}
     for fix in fixtures:
-        ridx = random.randint(0,len(dim)-1)
-        config[fix] = dim[ridx]
+        ridx = random.randint(0,len(dimlvls)-1)
+        config[fix] = dimlvls[ridx]
     return config
 
 def within_tol(config,ideal, tol):
@@ -197,8 +200,8 @@ def neighbors(config,tol=20):
     config: dictionary (string --> float)
     tol: float
     """
-    fixtures = _get_fixtures()
-    dimlvls = _get_dimlvl()
+    global fixtures
+    global dimlvls
     #for each fixture we iterate through all the setting that are within the
     #tolerance of the current fixture level
     for f in fixtures:
@@ -220,7 +223,7 @@ def _get_sim_single_fix(fix_id, diml):
     reading}, based on the dimming level diml. When fixture fix_id is
     on dimming level diml, how much are the sensors affected?
     """
-    sensors = _get_sensors()
+    global sensors
     d = {}
     for s in sensors:
         val = _get_sim_value(fix_id,s, diml)
@@ -247,7 +250,7 @@ def _sum_sensor_readings(sreadings):
     Sum all the readings according to sensorID and return a dictionary mapping from
     sensorID --> sum of reading values
     """
-    sensors = _get_sensors()
+    global sensors
     d ={}
     val = 0
     for sensor in sensors:
@@ -263,8 +266,9 @@ def form_query(sid, tablename='truth'):
     Select <all sensor readings> from tablename where <f1,f2,...,fn> matches fix_config and
     angle == this.angle
     """
+    global sensors
     query = 'select '
-    for sensor in _get_sensors():
+    for sensor in sensors:
         query += '%s,'%sensor
     query = query[:-1] #remove ending comma
     query += ' from %s where id=%s;'%(tablename,sid)
@@ -394,6 +398,16 @@ if __name__ == '__main__':
     parser.add_argument('-l','--dimfile',help='File containing dimming levels, one per line',default='dimlevels.txt')
     args = parser.parse_args()
     if args.host and args.database and args.username and args.password:
+        #initilize the fixtures,sensors and dimming levels
+        assert os.path.exists(args.fixturefile)
+        assert os.path.exists(args.sensorfile)
+        assert os.path.exists(args.dimfile)
+        _get_fixtures(args.fixturefile)
+        _get_sensors(args.sensorfile)
+        _get_dimlvls(args.dimfile)
+        print 'SENSORS',sensors
+        print 'FIXTURES',fixtures
+        print 'DIM',dimlvls
         #connect to the database
         connect(args.host, args.username, args.password,args.database)
         #if database connection succeeds, then we proceed to doing local search
